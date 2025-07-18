@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Админка карточек</title>
+  <style>
+    body {
+  font-family: 'Segoe UI', sans-serif;
+  background-color: #f5f5f5;
+  margin: 0;
+  padding: 40px;
+  color: #333;
+}
+
+h1, h2 {
+  text-align: center;
+}
+
+form {
+  max-width: 600px;
+  margin: 0 auto 40px auto;
+  background: #fff;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+input, textarea {
+  width: 100%;
+  padding: 10px;
+  margin-top: 10px;
+  margin-bottom: 15px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 16px;
+}
+
+button {
+  background-color: #4CAF50;
+  color: white;
+  padding: 10px 16px;
+  font-size: 16px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s ease-in-out;
+}
+
+button:hover {
+  background-color: #45a049;
+}
+
+#cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+  padding: 0 20px;
+}
+
+.card {
+  background-color: #fff;
+  border-radius: 10px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.card-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.card img {
+  max-width: 100%;
+  border-radius: 6px;
+  margin-top: 10px;
+}
+
+.card button {
+  margin-top: 10px;
+  background-color: #e53935;
+}
+
+.card button:hover {
+  background-color: #d32f2f;
+}
+  </style>
+</head>
+<body>
+
+  <h1>Добавить карточку</h1>
+  <form id="addForm">
+    <input type="text" placeholder="Название" name="title" required>
+    <textarea placeholder="Описание" name="description" required></textarea>
+    <input type="number" placeholder="Позиция" name="position" required>
+    <input type="text" placeholder="Ссылки на изображения (через запятую)" name="images">
+    <button type="submit">Добавить</button>
+  </form>
+
+  <h2>Список карточек</h2>
+  <div id="cards"></div>
+
+  <script>
+    const form = document.getElementById('addForm');
+    const cardsContainer = document.getElementById('cards');
+
+    function loadCards() {
+      fetch('/cards')
+        .then(res => res.json())
+        .then(cards => {
+          cardsContainer.innerHTML = '';
+          cards.forEach(card => {
+            const div = document.createElement('div');
+            div.className = 'card';
+            div.innerHTML = `
+              <h3>${card.title}</h3>
+              <p>${card.description}</p>
+              <p><strong>Позиция:</strong> ${card.position}</p>
+              ${card.images?.map(img => `<img src="${img}" alt="image">`).join('') || ''}
+              <button onclick="deleteCard(${card.id})">Удалить</button>
+            `;
+            cardsContainer.appendChild(div);
+          });
+        });
+    }
+
+    loadCards();
+
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      const formData = new FormData(form);
+      const data = {
+        title: formData.get('title'),
+        description: formData.get('description'),
+        position: parseInt(formData.get('position'), 10),
+        images: []
+      };
+      const imageUrls = formData.get('images');
+      if (imageUrls) {
+        data.images = imageUrls.split(',').map(url => url.trim());
+      }
+
+      fetch('/cards', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+      }).then(res => res.json())
+        .then(card => {
+        if (data.images.length > 0) {
+        fetch(`/cards/${card.id}/images`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data.images)
+        }).then(() => {
+            setTimeout(loadCards, 1000); // Подождать 1 секунду
+        });
+        } else {
+        loadCards();
+        }
+          form.reset();
+        });
+    });
+
+    function deleteCard(id) {
+      fetch(`/cards/${id}`, { method: 'DELETE' })
+        .then(() => loadCards());
+    }
+  </script>
+
+</body>
+</html>
